@@ -44,7 +44,9 @@ pub struct GitUrl {
     pub name: String,
     /// The owner/account/project name
     pub owner: Option<String>,
-    /// The organization name. Supported by Azure DevOps
+    /// subgroups, if any.
+    pub subgroups: Option<String>,
+    /// The organization name.
     pub organization: Option<String>,
     /// The full name of the repo, formatted as "owner/name"
     pub fullname: String,
@@ -62,6 +64,9 @@ pub struct GitUrl {
     pub git_suffix: bool,
     /// Indicate if url explicitly uses its scheme
     pub scheme_prefix: bool,
+
+    /// How many leading parts of the path should be skipped.
+    pub _skip_part_count: usize,
 }
 
 /// Build the printable GitUrl from its components
@@ -122,6 +127,7 @@ impl Default for GitUrl {
             host: None,
             name: "".to_string(),
             owner: None,
+            subgroups: None,
             organization: None,
             fullname: "".to_string(),
             scheme: Scheme::Unspecified,
@@ -131,6 +137,7 @@ impl Default for GitUrl {
             path: "".to_string(),
             git_suffix: false,
             scheme_prefix: false,
+            _skip_part_count: 0,
         }
     }
 }
@@ -153,8 +160,7 @@ impl GitUrl {
         new_giturl
     }
 
-    /// Returns a `Result<GitUrl>` after normalizing and parsing `url` for metadata
-    pub fn parse(url: &str) -> Result<GitUrl, GitUrlParseError> {
+    pub fn parse_with_skips(url: &str, skip_part_count: usize) -> Result<GitUrl, GitUrlParseError> {
         // Normalize the url so we can use Url crate to process ssh urls
         let normalized = normalize_url(url)?;
 
@@ -194,73 +200,64 @@ impl GitUrl {
         // name = reponame
         //
         // organizations are going to be supported on a per-host basis
-        let splitpath = &urlpath.rsplit_terminator('/').collect::<Vec<&str>>();
+        let mut splitpath = urlpath
+            .rsplit('/')
+            .filter(|&s| !s.is_empty())
+            .collect::<Vec<&str>>();
+
+        if skip_part_count > 0 {
+            splitpath = splitpath[0..splitpath.len() - skip_part_count].to_vec();
+        }
 
         #[cfg(feature = "tracing")]
         debug!("rsplit results for metadata: {:?}", splitpath);
 
         let name = splitpath[0].trim_end_matches(".git").to_string();
 
-        // TODO:  I think here is where we want to update the url pattern identification step.. I want to be able to have a hint that the user can pass
-
-        let (owner, organization, fullname) = match &scheme {
+        let (owner, subgroups, organization, fullname) = match &scheme {
             // We're not going to assume anything about metadata from a filepath
-            Scheme::File => (None::<String>, None::<String>, name.clone()),
+            Scheme::File => (None::<String>, None::<String>, None::<String>, name.clone()),
             _ => {
-                let mut fullname: Vec<&str> = Vec::new();
+                let mut fullname: Vec<String> = Vec::new();
 
-                // TODO: Add support for parsing out orgs from these urls
-                let hosts_w_organization_in_path = ["dev.azure.com", "ssh.dev.azure.com"];
-                //vec!["dev.azure.com", "ssh.dev.azure.com", "visualstudio.com"];
-
-                let host_str = if let Some(host) = normalized.host_str() {
-                    host
-                } else {
+                if normalized.host_str().is_none() {
                     return Err(GitUrlParseError::UnsupportedUrlHostFormat);
                 };
 
-                match hosts_w_organization_in_path.contains(&host_str) {
+                match splitpath.len() > 2 {
                     true => {
                         #[cfg(feature = "tracing")]
                         debug!("Found a git provider with an org");
 
-                        // The path differs between git:// and https:// schemes
+                        // Organization
+                        let organization = splitpath[splitpath.len() - 1].to_string();
+                        fullname.push(organization.clone());
 
-                        match &scheme {
-                            // Example: "git@ssh.dev.azure.com:v3/CompanyName/ProjectName/RepoName",
-                            Scheme::Ssh => {
-                                // Organization
-                                fullname.push(splitpath[2]);
-                                // Project/Owner name
-                                fullname.push(splitpath[1]);
-                                // Repo name
-                                fullname.push(splitpath[0]);
-
-                                (
-                                    Some(splitpath[1].to_string()),
-                                    Some(splitpath[2].to_string()),
-                                    fullname.join("/"),
-                                )
-                            }
-                            // Example: "https://CompanyName@dev.azure.com/CompanyName/ProjectName/_git/RepoName",
-                            Scheme::Https => {
-                                // Organization
-                                fullname.push(splitpath[3]);
-                                // Project/Owner name
-                                fullname.push(splitpath[2]);
-                                // Repo name
-                                fullname.push(splitpath[0]);
-
-                                (
-                                    Some(splitpath[2].to_string()),
-                                    Some(splitpath[3].to_string()),
-                                    fullname.join("/"),
-                                )
-                            }
-
-                            // TODO: I'm not sure if I want to support throwing this error long-term
-                            _ => return Err(GitUrlParseError::UnexpectedScheme),
+                        // Project/Owner name and subgroups (if any)
+                        let subgroups_and_project_parts =
+                            splitpath[1..splitpath.len() - 1].to_vec();
+                        let project = subgroups_and_project_parts[0].to_string();
+                        let mut subgroups_vec = subgroups_and_project_parts[1..].to_vec();
+                        subgroups_vec.reverse();
+                        let subgroups = if subgroups_vec.is_empty() {
+                            None
+                        } else {
+                            Some(subgroups_vec.join("/"))
+                        };
+                        if let Some(subgroups) = &subgroups {
+                            fullname.push(subgroups.clone());
                         }
+                        fullname.push(project.clone());
+
+                        // Repo name
+                        fullname.push(name.clone());
+
+                        (
+                            Some(project),
+                            subgroups,
+                            Some(organization),
+                            fullname.join("/"),
+                        )
                     }
                     false => {
                         if !url.starts_with("ssh") && splitpath.len() < 2 {
@@ -274,12 +271,13 @@ impl GitUrl {
                         };
 
                         // push owner
-                        fullname.push(splitpath[position]);
+                        fullname.push(splitpath[position].to_string());
                         // push name
-                        fullname.push(name.as_str());
+                        fullname.push(name.clone());
 
                         (
                             Some(splitpath[position].to_string()),
+                            None::<String>,
                             None::<String>,
                             fullname.join("/"),
                         )
@@ -308,6 +306,7 @@ impl GitUrl {
             host: final_host,
             name,
             owner,
+            subgroups,
             organization,
             fullname,
             scheme,
@@ -320,7 +319,13 @@ impl GitUrl {
             path: final_path,
             git_suffix: *git_suffix_check,
             scheme_prefix: url.contains("://") || url.starts_with("git:"),
+            _skip_part_count: skip_part_count,
         })
+    }
+
+    /// Returns a `Result<GitUrl>` after normalizing and parsing `url` for metadata
+    pub fn parse(url: &str) -> Result<GitUrl, GitUrlParseError> {
+        GitUrl::parse_with_skips(url, 0)
     }
 }
 
@@ -519,4 +524,32 @@ pub enum GitUrlParseError {
 
     #[error("Found null bytes within input url before parsing")]
     FoundNullBytes,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn ssh_org_project_ports_gitlab() {
+        let test_url = "ssh://git@gitlab.example.com:222/org/project/repo.git";
+        let parsed = GitUrl::parse(test_url).expect("URL parse failed");
+        let expected = GitUrl {
+            host: Some("gitlab.example.com".to_string()),
+            name: "repo".to_string(),
+            owner: Some("subgroup".to_string()),
+            subgroups: None,
+            organization: None,
+            fullname: "org/subgroup/repo".to_string(),
+            scheme: Scheme::Ssh,
+            user: Some("git".to_string()),
+            token: None,
+            port: Some(222),
+            path: "/org/subgroup/repo.git".to_string(),
+            git_suffix: true,
+            scheme_prefix: true,
+            _skip_part_count: 0,
+        };
+
+        assert_eq!(parsed, expected);
+    }
 }
