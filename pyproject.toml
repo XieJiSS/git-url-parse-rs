@@ -1,5 +1,5 @@
 [project]
-name = "git-url-parse-py"
+name = "git-url-parse"
 version = "0.4.5"
 description = ""
 authors = [
