@@ -4,6 +4,9 @@ use strum::{Display, EnumString, VariantNames};
 use thiserror::Error;
 use url::Url;
 
+#[cfg(feature = "python")]
+mod python;
+
 #[cfg(feature = "tracing")]
 use tracing::debug;
 
@@ -53,9 +56,9 @@ pub struct GitUrl {
     /// The git url scheme
     pub scheme: Scheme,
     /// The authentication user
-    pub user: Option<String>,
+    pub auth_user: Option<String>,
     /// The oauth token (could appear in the https urls)
-    pub token: Option<String>,
+    pub auth_token: Option<String>,
     /// The non-conventional port where git service is hosted
     pub port: Option<u16>,
     /// The path to repo w/ respect to user + hostname
@@ -79,13 +82,13 @@ impl fmt::Display for GitUrl {
 
         let auth_info = match self.scheme {
             Scheme::Ssh | Scheme::Git | Scheme::GitSsh => {
-                if let Some(user) = &self.user {
+                if let Some(user) = &self.auth_user {
                     format!("{}@", user)
                 } else {
                     String::new()
                 }
             }
-            Scheme::Http | Scheme::Https => match (&self.user, &self.token) {
+            Scheme::Http | Scheme::Https => match (&self.auth_user, &self.auth_token) {
                 (Some(user), Some(token)) => format!("{}:{}@", user, token),
                 (Some(user), None) => format!("{}@", user),
                 (None, Some(token)) => format!("{}@", token),
@@ -131,8 +134,8 @@ impl Default for GitUrl {
             organization: None,
             fullname: "".to_string(),
             scheme: Scheme::Unspecified,
-            user: None,
-            token: None,
+            auth_user: None,
+            auth_token: None,
             port: None,
             path: "".to_string(),
             git_suffix: false,
@@ -155,8 +158,8 @@ impl GitUrl {
     /// Intended use-case is for non-destructive printing GitUrl excluding any embedded auth info
     pub fn trim_auth(&self) -> GitUrl {
         let mut new_giturl = self.clone();
-        new_giturl.user = None;
-        new_giturl.token = None;
+        new_giturl.auth_user = None;
+        new_giturl.auth_token = None;
         new_giturl
     }
 
@@ -310,11 +313,11 @@ impl GitUrl {
             organization,
             fullname,
             scheme,
-            user: match normalized.username().to_string().len() {
+            auth_user: match normalized.username().to_string().len() {
                 0 => None,
                 _ => Some(normalized.username().to_string()),
             },
-            token: normalized.password().map(|p| p.to_string()),
+            auth_token: normalized.password().map(|p| p.to_string()),
             port: normalized.port(),
             path: final_path,
             git_suffix: *git_suffix_check,
@@ -541,8 +544,8 @@ mod tests {
             organization: None,
             fullname: "org/subgroup/repo".to_string(),
             scheme: Scheme::Ssh,
-            user: Some("git".to_string()),
-            token: None,
+            auth_user: Some("git".to_string()),
+            auth_token: None,
             port: Some(222),
             path: "/org/subgroup/repo.git".to_string(),
             git_suffix: true,

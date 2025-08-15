@@ -1,0 +1,20 @@
+[project]
+name = "git-url-parse-py"
+version = "0.4.5"
+description = ""
+authors = [
+    {name = "XieJiSS",email = "XieJiSS@users.noreply.github.com"}
+]
+readme = "README.md"
+requires-python = ">=3.9,<4"
+dependencies = []
+
+[build-system]
+requires = ["maturin (>=1.9.3,<2.0.0)"]
+build-backend = "maturin"
+
+[tool.poetry]
+package-mode = false
+
+[tool.maturin]
+module-name = "git_url_parse"
