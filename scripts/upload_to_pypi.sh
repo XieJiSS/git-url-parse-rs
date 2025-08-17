@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ $# -eq 0 ]; then
-    GH_WORKFLOW_ID="$(gh run ls -R XieJiSS/git-url-parse-rs -b main -s success -u XieJiSS -w Maturin -L 1 --json 'databaseId' -q '.[].databaseId' | head -n 1)"
+    GH_WORKFLOW_ID="$(gh run ls -R XieJiSS/git-url-parse-rs -s success -u XieJiSS -w Maturin -L 1 --json 'databaseId' -q '.[].databaseId' | head -n 1)"
 else
     GH_WORKFLOW_ID=$1
 fi

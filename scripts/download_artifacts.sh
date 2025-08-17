@@ -1,7 +1,7 @@
 #!/bin/bash
 
 cd "$(dirname "$0")"/../
-GH_WORKFLOW_ID="$(gh run ls -R XieJiSS/git-url-parse-rs -b main -s success -u XieJiSS -w Maturin -L 1 --json 'databaseId' -q '.[].databaseId' | head -n 1)"
+GH_WORKFLOW_ID="$(gh run ls -R XieJiSS/git-url-parse-rs -s success -u XieJiSS -w Maturin -L 1 --json 'databaseId' -q '.[].databaseId' | head -n 1)"
 
 if [ -z "$GH_WORKFLOW_ID" ]; then
     echo "Error: GH_WORKFLOW_ID is empty. No successful Maturin workflow runs found."
