@@ -32,7 +32,7 @@ fn parse(url: &str) -> PyResult<Py<PyDict>> {
 }
 
 #[pymodule]
-fn git_url_parse(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
+fn git_url_parse_rs(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse, m)?)?;
     Ok(())
 }

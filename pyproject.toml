@@ -1,5 +1,5 @@
 [project]
-name = "git-url-parse"
+name = "git-url-parse-rs"
 version = "0.4.5"
 description = ""
 authors = [
@@ -16,5 +16,9 @@ build-backend = "maturin"
 [tool.poetry]
 package-mode = false
 
+# use twine to publish artifacts because we have to use gh actions os matrix to achieve native builds
+[tool.poetry.group.build.dependencies]
+twine = "^6.1.0"
+
 [tool.maturin]
-module-name = "git_url_parse"
+module-name = "git_url_parse_rs"
