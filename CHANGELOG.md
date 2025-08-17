@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.6](https://github.com/XieJiSS/git-url-parse-rs/tree/v0.4.6) - 2025-08-17
+
+### Added
+
+- Python support via PyO3 and maturin
+- subgroup support
+- configurable skip part behavior 
+
+### Changed
+
+- Get rid of domain-specific logics
+
 ## [0.4.5](https://github.com/tjtelan/git-url-parse-rs/tree/v0.4.5) - 2024-09-06
 
 ### CI

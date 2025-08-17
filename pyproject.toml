@@ -1,6 +1,6 @@
 [project]
 name = "git-url-parse-rs"
-version = "0.4.5"
+version = "0.4.6"
 description = ""
 authors = [
     {name = "XieJiSS",email = "XieJiSS@users.noreply.github.com"}
